@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.env
+.env.local
+.env.*.local
+.data
+*.log
+.DS_Store
+.idea
+.vscode
+*.swp
+uploads
+tmp
+.husky/_
+docs/swagger.json

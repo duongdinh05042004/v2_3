@@ -1,0 +1,26 @@
+{
+  "event": "user.interaction",
+  "event_id": "evt_interaction_001",
+  "timestamp": 1709876700,
+  "advertiser_id": "7123456789",
+  "campaign": {
+    "campaign_id": "1234567890123456789",
+    "campaign_name": "Brand Awareness Q1",
+    "ad_id": "111",
+    "ad_name": "Teaser"
+  },
+  "form": {
+    "form_id": "form_abc123",
+    "form_name": "Contact Form"
+  },
+  "lead_data": {
+    "full_name": "Lê Văn C",
+    "email": "levanc@email.com",
+    "phone": "+84987654321",
+    "city": "Đà Nẵng",
+    "interests": ["mobile apps"],
+    "utm_source": "tiktok",
+    "utm_campaign": "brand_q1",
+    "ttclid": "TT-interaction-001"
+  }
+}

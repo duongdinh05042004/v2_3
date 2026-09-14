@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+    <title>TikTok Lead Generation × Bitrix24 CRM</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      html,
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>TikTok Lead Generation × Bitrix24 CRM</h1>
+      <p>Cấu hình mapping TikTok fields → Bitrix24 và deal rules theo đề bài.</p>
+    </header>
+    <main>
+      <section>
+        <h2>Cấu hình hiện tại</h2>
+        <p>Dữ liệu đang lưu từ GET /api/v1/config/mappings và GET /api/v1/config/rules.</p>
+        <pre id="current-config">Đang tải...</pre>
+      </section>
+      <section>
+        <h2>Mapping</h2>
+        <p>
+          JSON đề bài: field_mapping (TikTok → Bitrix24) và deal_rules. PUT
+          /api/v1/config/mappings và PUT /api/v1/config/rules.
+        </p>
+        <textarea id="mapping-editor" spellcheck="false"></textarea>
+        <div class="actions">
+          <button type="button" id="save-btn">Lưu mapping</button>
+          <button type="button" id="reload-btn">Tải lại</button>
+        </div>
+        <p class="status" id="status"></p>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

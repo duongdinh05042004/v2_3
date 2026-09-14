@@ -1,0 +1,96 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npm run start:dev
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      BITRIX24_WEBHOOK_URL: http://bitrix24-mock:4002/rest
+      TIKTOK_API_BASE_URL: http://tiktok-mock:4001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tiktok
+      POSTGRES_PASSWORD: tiktok_secret
+      POSTGRES_DB: tiktok_bitrix24
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tiktok -d tiktok_bitrix24']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  bitrix24-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npm run mock:bitrix
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - '4002:4002'
+    environment:
+      BITRIX24_MOCK_PORT: 4002
+
+  tiktok-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npx ts-node -r tsconfig-paths/register mocks/tiktok/server.ts
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - '4001:4001'
+    environment:
+      TIKTOK_MOCK_PORT: 4001
+
+volumes:
+  pgdata:

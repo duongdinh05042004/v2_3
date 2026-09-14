@@ -1,0 +1,32 @@
+{
+  "event": "form.complete",
+  "event_id": "evt_form_complete_001",
+  "timestamp": 1709876600,
+  "advertiser_id": "7123456789",
+  "campaign": {
+    "campaign_id": "1234567890123456789",
+    "campaign_name": "Spring Sale 2024",
+    "ad_id": "9876543210987654321",
+    "ad_name": "Product Demo Video"
+  },
+  "form": {
+    "form_id": "form_abc123",
+    "form_name": "Contact Form"
+  },
+  "lead_data": {
+    "full_name": "Trần Thị B",
+    "email": "tranthib@email.com",
+    "phone": "0912345678",
+    "city": "Hồ Chí Minh",
+    "interests": ["technology"],
+    "utm_source": "tiktok",
+    "utm_campaign": "spring_sale_2024",
+    "ttclid": "TT-form-complete-001"
+  },
+  "custom_questions": [
+    {
+      "question": "Budget range",
+      "answer": "10-20 triệu VND"
+    }
+  ]
+}
