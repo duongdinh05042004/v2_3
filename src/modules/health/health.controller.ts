@@ -1,10 +1,15 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { Public } from '../../common/decorators/public.decorator';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { AppCacheService } from '../../cache/cache.service';
 
 @ApiTags('health')
+@Public()
+@SkipThrottle()
+@UseGuards(ApiKeyGuard)
 @Controller()
 export class HealthController {
   constructor(
@@ -13,7 +18,6 @@ export class HealthController {
     private readonly cache: AppCacheService,
   ) {}
 
-  @Public()
   @Get('health')
   @HealthCheck()
   check() {
@@ -26,13 +30,11 @@ export class HealthController {
     ]);
   }
 
-  @Public()
   @Get('health/live')
   live() {
     return { status: 'ok' };
   }
 
-  @Public()
   @Get('health/ready')
   ready() {
     return this.check();

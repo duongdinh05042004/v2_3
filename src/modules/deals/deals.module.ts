@@ -12,6 +12,7 @@ import { RulesModule } from '../rules/rules.module';
 import { TimelineModule } from '../timeline/timeline.module';
 import { AssignmentService } from './assignment.service';
 import { DealsService } from './deals.service';
+import { WorkflowService } from './workflow.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { DealsService } from './deals.service';
     NotificationsModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.BITRIX_SYNC }, { name: QUEUE_NAMES.TIKTOK_CONVERSION }),
   ],
-  providers: [DealsService, AssignmentService],
-  exports: [DealsService, AssignmentService],
+  providers: [DealsService, AssignmentService, WorkflowService],
+  exports: [DealsService, AssignmentService, WorkflowService],
 })
 export class DealsModule {}

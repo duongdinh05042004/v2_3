@@ -23,7 +23,16 @@ async function seed(): Promise<void> {
 
   for (const person of defaultSalesPersons) {
     const existing = await salesRepo.findOne({ where: { externalId: person.externalId } });
-    if (!existing) {
+    if (existing) {
+      existing.name = person.name;
+      existing.email = person.email;
+      existing.bitrix24UserId = person.bitrix24UserId;
+      existing.territories = person.territories;
+      existing.specialties = person.specialties;
+      existing.maxOpenDeals = person.maxOpenDeals;
+      existing.managerExternalId = person.managerExternalId;
+      await salesRepo.save(existing);
+    } else {
       await salesRepo.save(salesRepo.create(person));
     }
   }

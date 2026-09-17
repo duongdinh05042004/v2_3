@@ -5,18 +5,7 @@ import { Repository } from 'typeorm';
 import { safeEqual } from '../../common/utils/timing-safe.util';
 import { WebhookEvent } from '../../database/entities/webhook-event.entity';
 import { DealsService } from '../deals/deals.service';
-
-export type BitrixDealWebhook = {
-  event: string;
-  event_id?: string;
-  data?: {
-    FIELDS?: {
-      ID?: number | string;
-      STAGE_ID?: string;
-      OPPORTUNITY?: string;
-    };
-  };
-};
+import { Bitrix24WebhookDto } from './dto/bitrix24-webhook.dto';
 
 @Injectable()
 export class Bitrix24WebhookService {
@@ -28,10 +17,10 @@ export class Bitrix24WebhookService {
     private readonly config: ConfigService,
   ) {}
 
-  async handle(payload: BitrixDealWebhook, secret?: string): Promise<{ accepted: boolean }> {
+  async handle(payload: Bitrix24WebhookDto, secret?: string): Promise<{ accepted: boolean }> {
     const expected = this.config.get<string>('bitrix24.webhookSecret') ?? '';
-    if (secret && !safeEqual(secret, expected)) {
-      throw new UnauthorizedException('Invalid Bitrix24 webhook secret');
+    if (!expected || !secret || !safeEqual(secret, expected)) {
+      throw new UnauthorizedException('Invalid or missing Bitrix24 webhook secret');
     }
 
     const eventId = payload.event_id ?? `b24-${payload.event}-${payload.data?.FIELDS?.ID ?? Date.now()}`;
@@ -57,7 +46,7 @@ export class Bitrix24WebhookService {
       const deal = await this.deals.findByBitrixId(bitrixId);
       if (deal) {
         const status = stage === 'WON' ? 'won' : stage === 'LOST' ? 'lost' : 'open';
-        await this.deals.updateStatus(deal.id, status, stage);
+        await this.deals.updateStatus(deal.id, status, stage, undefined, true);
         this.logger.log(`Deal ${deal.id} updated from Bitrix24 stage ${stage}`);
       }
     }

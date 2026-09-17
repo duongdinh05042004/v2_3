@@ -1,7 +1,7 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository } from 'typeorm';
-import { DEAL_STATUS, JOB_NAMES, QUEUE_NAMES, SYNC_STATUS } from '../../common/constants';
+import { APPROVAL_STATUS, DEAL_STATUS, JOB_NAMES, QUEUE_NAMES, SYNC_STATUS } from '../../common/constants';
 import { paginateMeta, PaginatedResult } from '../../common/dto/pagination.dto';
 import { Deal } from '../../database/entities/deal.entity';
 import { Lead } from '../../database/entities/lead.entity';
@@ -14,6 +14,8 @@ import { RuleEngineService } from '../rules/rule-engine.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LeadsService } from '../leads/leads.service';
+import { WorkflowService } from './workflow.service';
+import { UpdateDealDto } from './dto/update-deal.dto';
 
 export type DealQuery = {
   page: number;
@@ -36,6 +38,7 @@ export class DealsService {
     private readonly config: ConfigurationService,
     private readonly timeline: TimelineService,
     private readonly notifications: NotificationsService,
+    private readonly workflow: WorkflowService,
   ) {}
 
   async convertLead(leadId: string, force = false): Promise<Deal> {
@@ -58,6 +61,7 @@ export class DealsService {
     const stage = pipeline.stages.find((item) => item.id === stageId);
     const assignmentConfig = await this.config.getAssignment();
     const assigned = await this.assignment.assign(context, assignmentConfig);
+    const managerExternalId = await this.workflow.resolveDirectManager(assigned.assignedTo);
 
     const deal = await this.dealRepo.save(
       this.dealRepo.create({
@@ -71,6 +75,8 @@ export class DealsService {
         status: DEAL_STATUS.OPEN,
         assignedTo: assigned.assignedTo,
         assignedByRule: assigned.assignedByRule,
+        managerExternalId,
+        approvalStatus: APPROVAL_STATUS.DRAFT,
         bitrix24SyncStatus: SYNC_STATUS.PENDING,
       }),
     );
@@ -79,6 +85,7 @@ export class DealsService {
     await this.timeline.add('deal', deal.id, 'created', 'Deal created from conversion rule', {
       ruleId: createRule?.id ?? 'manual',
       assignedTo: assigned.assignedTo,
+      managerExternalId,
     });
     await this.timeline.add('lead', lead.id, 'converted', 'Lead converted to deal', { dealId: deal.id });
     await this.notifications.emit('deal.created', {
@@ -135,8 +142,89 @@ export class DealsService {
     return deal;
   }
 
-  async updateStatus(id: string, status: string, stage?: string): Promise<Deal> {
+  async getWorkflow(id: string, actorId?: string) {
     const deal = await this.findOne(id);
+    return this.workflow.snapshot(deal, actorId);
+  }
+
+  async updateDeal(id: string, patch: UpdateDealDto, actorId: string): Promise<Deal> {
+    const deal = await this.findOne(id);
+    await this.workflow.assertCanEditByActor(deal, actorId);
+    if (patch.title !== undefined) {
+      deal.title = patch.title;
+    }
+    if (patch.amount !== undefined) {
+      deal.amount = patch.amount;
+    }
+    if (patch.stage !== undefined) {
+      deal.stage = patch.stage;
+    }
+    const saved = await this.dealRepo.save(deal);
+    await this.timeline.add('deal', saved.id, 'edited', 'Deal edited before final approval', {
+      actorId,
+      patch,
+    });
+    await this.bitrixQueue.add(JOB_NAMES.SYNC_DEAL, { dealId: saved.id }, { attempts: 5, backoff: { type: 'exponential', delay: 2000 } });
+    return saved;
+  }
+
+  async submitApproval(id: string, actorId: string): Promise<Deal> {
+    const deal = await this.findOne(id);
+    await this.workflow.assertCanSubmit(deal, actorId);
+    deal.approvalStatus = APPROVAL_STATUS.PENDING_APPROVAL;
+    deal.submittedBy = actorId;
+    if (!deal.managerExternalId) {
+      deal.managerExternalId = await this.workflow.resolveDirectManager(deal.assignedTo);
+    }
+    const saved = await this.dealRepo.save(deal);
+    await this.timeline.add('deal', saved.id, 'submitted_for_approval', 'Deal submitted to the direct manager', {
+      actorId,
+      managerExternalId: saved.managerExternalId,
+    });
+    await this.notifications.emit('deal.submitted_for_approval', {
+      dealId: saved.id,
+      submittedBy: actorId,
+      managerExternalId: saved.managerExternalId,
+    });
+    return saved;
+  }
+
+  async approve(id: string, actorId: string): Promise<Deal> {
+    const deal = await this.findOne(id);
+    await this.workflow.assertCanApprove(deal, actorId);
+    deal.approvalStatus = APPROVAL_STATUS.APPROVED;
+    deal.approvedBy = actorId;
+    deal.approvedAt = new Date();
+    const saved = await this.dealRepo.save(deal);
+    await this.timeline.add('deal', saved.id, 'approved', 'Direct manager gave final approval', { actorId });
+    await this.notifications.emit('deal.approved', {
+      dealId: saved.id,
+      approvedBy: actorId,
+      assignedTo: saved.assignedTo,
+    });
+    return saved;
+  }
+
+  async updateStatus(
+    id: string,
+    status: string,
+    stage?: string,
+    actorId?: string,
+    skipApproval = false,
+  ): Promise<Deal> {
+    const deal = await this.findOne(id);
+    if (status === DEAL_STATUS.WON && !skipApproval) {
+      if (deal.approvalStatus !== APPROVAL_STATUS.APPROVED) {
+        throw new ForbiddenException('Direct manager must give final approval before the deal can be marked won');
+      }
+    } else if (status !== DEAL_STATUS.LOST && !skipApproval) {
+      if (actorId) {
+        await this.workflow.assertCanEditByActor(deal, actorId);
+      } else {
+        this.workflow.assertCanEdit(deal);
+      }
+    }
+
     deal.status = status;
     if (stage) {
       deal.stage = stage;
@@ -146,7 +234,7 @@ export class DealsService {
       deal.probability = status === DEAL_STATUS.WON ? 100 : 0;
     }
     const saved = await this.dealRepo.save(deal);
-    await this.timeline.add('deal', saved.id, 'status_changed', `Deal status changed to ${status}`, { stage });
+    await this.timeline.add('deal', saved.id, 'status_changed', `Deal status changed to ${status}`, { stage, actorId });
 
     if (status === DEAL_STATUS.WON && deal.lead?.ttclid) {
       const conversion = await this.conversionRepo.save(

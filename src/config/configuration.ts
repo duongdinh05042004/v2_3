@@ -55,6 +55,10 @@ export type AppConfig = {
     cron: string;
     staleLeadHours: number;
   };
+  cors: {
+    origins: string[];
+  };
+  swaggerEnabled: boolean;
   logLevel: string;
 };
 
@@ -115,5 +119,14 @@ export default (): AppConfig => ({
     cron: process.env.REPORT_CRON ?? '0 8 * * *',
     staleLeadHours: parseInt(process.env.ALERT_STALE_LEAD_HOURS ?? '24', 10),
   },
+  cors: {
+    origins: (process.env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  },
+  swaggerEnabled: process.env.SWAGGER_ENABLED
+    ? process.env.SWAGGER_ENABLED === 'true'
+    : (process.env.NODE_ENV ?? 'development') !== 'production',
   logLevel: process.env.LOG_LEVEL ?? 'info',
 });

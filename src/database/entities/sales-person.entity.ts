@@ -11,6 +11,9 @@ export class SalesPerson {
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  @Column({ name: 'manager_external_id', type: 'varchar', length: 255, nullable: true })
+  managerExternalId!: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   email!: string | null;
 

@@ -45,6 +45,9 @@ docker compose -f docker-compose.prod.yml exec api node dist/src/database/seeds/
 ## Environment checklist
 
 - Rotate `API_KEY`, `TIKTOK_APP_SECRET`, `BITRIX24_WEBHOOK_SECRET`.
+- All `/api/v1/*` routes require header `x-api-key`. Webhooks stay public but **require** `TikTok-Signature` / `x-bitrix-secret`. `/health` is public for probes.
+- `/docs` is **off** in production unless `SWAGGER_ENABLED=true`; when on, it requires the API key (`x-api-key` or `?api_key=`).
+- Set `CORS_ORIGINS` (comma-separated). Empty in production disables browser cross-origin calls.
 - Set `DB_SYNC=false` and rely on migrations (`migrationsRun` is enabled).
 - Point `BITRIX24_WEBHOOK_URL` at a real inbound webhook (`https://xxx.bitrix24.com/rest/1/xxxxx`).
 - Point `TIKTOK_API_BASE_URL` at `https://business-api.tiktok.com`.
@@ -66,4 +69,5 @@ Terminate TLS at Nginx / Caddy and forward:
 
 - `POST /webhooks/tiktok/leads` — do **not** mutate the body.
 - `POST /webhooks/bitrix24/deals`
-- `/api/v1/*` and `/docs` (restrict `/docs` by IP in production).
+- `/api/v1/*` (require `x-api-key`)
+- `/docs` only if `SWAGGER_ENABLED=true`, still behind API key

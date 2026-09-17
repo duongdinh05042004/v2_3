@@ -5,7 +5,9 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
+import { AuthModule } from './auth/auth.module';
 import { AppCacheModule } from './cache/cache.module';
+import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import configuration from './config/configuration';
@@ -78,6 +80,7 @@ import { QueueWorkersModule } from './queue/queue.module';
       ],
     }),
     AppCacheModule,
+    AuthModule,
     HealthModule,
     WebhooksModule,
     ConfigurationModule,
@@ -88,6 +91,7 @@ import { QueueWorkersModule } from './queue/queue.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],

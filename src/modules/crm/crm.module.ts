@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '../../common/constants';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { DealsController } from '../deals/deals.controller';
 import { DealsModule } from '../deals/deals.module';
 import { LeadsController } from '../leads/leads.controller';
@@ -15,5 +16,6 @@ import { TimelineModule } from '../timeline/timeline.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.BITRIX_SYNC }),
   ],
   controllers: [LeadsController, DealsController],
+  providers: [ApiKeyGuard],
 })
 export class CrmModule {}

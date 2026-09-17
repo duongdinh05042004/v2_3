@@ -52,6 +52,23 @@ export class Deal {
   @Column({ name: 'assigned_to', type: 'varchar', length: 255, nullable: true })
   assignedTo!: string | null;
 
+  @Index('idx_deals_manager')
+  @Column({ name: 'manager_external_id', type: 'varchar', length: 255, nullable: true })
+  managerExternalId!: string | null;
+
+  @Index('idx_deals_approval_status')
+  @Column({ name: 'approval_status', type: 'varchar', length: 50, default: 'draft' })
+  approvalStatus!: string;
+
+  @Column({ name: 'submitted_by', type: 'varchar', length: 255, nullable: true })
+  submittedBy!: string | null;
+
+  @Column({ name: 'approved_by', type: 'varchar', length: 255, nullable: true })
+  approvedBy!: string | null;
+
+  @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
+  approvedAt!: Date | null;
+
   @Column({ name: 'assigned_by_rule', type: 'varchar', length: 255, nullable: true })
   assignedByRule!: string | null;
 

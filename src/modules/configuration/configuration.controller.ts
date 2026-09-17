@@ -1,10 +1,14 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { UpdateMappingsDto } from './dto/mapping.dto';
 import { UpdateRulesDto } from './dto/rules.dto';
 import { ConfigurationService } from './configuration.service';
 
 @ApiTags('config')
+@ApiSecurity('api-key')
+@ApiHeader({ name: 'x-api-key', required: true })
+@UseGuards(ApiKeyGuard)
 @Controller('config')
 export class ConfigurationController {
   constructor(private readonly config: ConfigurationService) {}

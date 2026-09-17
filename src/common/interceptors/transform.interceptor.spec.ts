@@ -23,4 +23,14 @@ describe('TransformInterceptor', () => {
       done();
     });
   });
+
+  it('does not wrap swagger docs', (done) => {
+    const context = {
+      switchToHttp: () => ({ getRequest: () => ({ url: '/docs/swagger.json' }) }),
+    };
+    interceptor.intercept(context as never, { handle: () => of({ openapi: '3.0' }) }).subscribe((value) => {
+      expect(value).toEqual({ openapi: '3.0' });
+      done();
+    });
+  });
 });

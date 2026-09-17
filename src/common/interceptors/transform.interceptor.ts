@@ -13,6 +13,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, Envelope<T> |
     if (
       req.url?.startsWith('/health') ||
       req.url?.startsWith('/webhooks') ||
+      req.url?.startsWith('/docs') ||
       req.url?.includes('/reports/export')
     ) {
       return next.handle();

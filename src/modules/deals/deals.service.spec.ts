@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { DEAL_STATUS } from '../../common/constants';
 import { Lead } from '../../database/entities/lead.entity';
 import { DealsService } from './deals.service';
@@ -45,6 +45,23 @@ describe('DealsService', () => {
   };
   const timeline = { add: jest.fn() };
   const notifications = { emit: jest.fn() };
+  const workflow = {
+    resolveDirectManager: jest.fn(async () => 'sp_manager'),
+    canEdit: jest.fn(() => true),
+    snapshot: jest.fn(async () => ({
+      assignedTo: 'sp_tech',
+      directManager: 'sp_manager',
+      approvalStatus: 'draft',
+      canEdit: true,
+      canSubmitApproval: true,
+      canApprove: false,
+      finalStepLocked: false,
+    })),
+    assertCanEdit: jest.fn(),
+    assertCanEditByActor: jest.fn(),
+    assertCanSubmit: jest.fn(),
+    assertCanApprove: jest.fn(),
+  };
 
   const service = new DealsService(
     dealRepo as never,
@@ -57,6 +74,7 @@ describe('DealsService', () => {
     config as never,
     timeline as never,
     notifications as never,
+    workflow as never,
   );
 
   beforeEach(() => {
@@ -74,6 +92,8 @@ describe('DealsService', () => {
     const deal = await service.convertLead('lead-1');
     expect(deal.title).toContain('Nguyễn Văn A');
     expect(deal.assignedTo).toBe('sp_tech');
+    expect(deal.managerExternalId).toBe('sp_manager');
+    expect(deal.approvalStatus).toBe('draft');
     expect(deal.amount).toBe(String(5_000_000));
     expect(leads.markConverted).toHaveBeenCalledWith('lead-1');
     expect(bitrixQueue.add).toHaveBeenCalled();
@@ -108,10 +128,55 @@ describe('DealsService', () => {
       lead,
       amount: '1000',
       currency: 'VND',
+      approvalStatus: 'approved',
+      status: 'open',
     });
     dealRepo.save.mockImplementation(async (data: { id?: string }) => ({ id: 'deal-1', ...data }));
     await service.updateStatus('deal-1', DEAL_STATUS.WON, 'WON');
     expect(conversionQueue.add).toHaveBeenCalled();
     expect(notifications.emit).toHaveBeenCalledWith('deal.won', expect.any(Object));
+  });
+
+  it('blocks won until the direct manager approves', async () => {
+    dealRepo.findOne.mockResolvedValue({
+      id: 'deal-1',
+      lead,
+      approvalStatus: 'pending_approval',
+      status: 'open',
+    });
+    await expect(service.updateStatus('deal-1', DEAL_STATUS.WON, 'WON')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets the assignee submit and the manager approve', async () => {
+    dealRepo.findOne.mockResolvedValue({
+      id: 'deal-1',
+      assignedTo: 'sp_tech',
+      managerExternalId: 'sp_manager',
+      approvalStatus: 'draft',
+      status: 'open',
+    });
+    await service.submitApproval('deal-1', 'sp_tech');
+    expect(workflow.assertCanSubmit).toHaveBeenCalled();
+    await service.approve('deal-1', 'sp_manager');
+    expect(workflow.assertCanApprove).toHaveBeenCalled();
+    expect(notifications.emit).toHaveBeenCalledWith('deal.submitted_for_approval', expect.any(Object));
+    expect(notifications.emit).toHaveBeenCalledWith('deal.approved', expect.any(Object));
+  });
+
+  it('returns workflow snapshot and allows edits before final approval', async () => {
+    dealRepo.findOne.mockResolvedValue({
+      id: 'deal-1',
+      title: 'Old',
+      amount: '1',
+      stage: 'NEW',
+      approvalStatus: 'draft',
+      status: 'open',
+    });
+    await expect(service.getWorkflow('deal-1', 'sp_tech')).resolves.toMatchObject({
+      directManager: 'sp_manager',
+    });
+    const edited = await service.updateDeal('deal-1', { title: 'New title', amount: '2', stage: 'QUALIFIED' }, 'sp_tech');
+    expect(edited.title).toBe('New title');
+    expect(workflow.assertCanEditByActor).toHaveBeenCalled();
   });
 });

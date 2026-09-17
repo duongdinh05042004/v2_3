@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { extractHeaderApiKey } from '../auth/extract-api-key';
 import { safeEqual } from '../utils/timing-safe.util';
 
 @Injectable()
@@ -22,9 +23,9 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const provided = request.header('x-api-key') ?? request.header('authorization')?.replace(/^Bearer\s+/i, '');
+    const provided = extractHeaderApiKey(request);
     const expected = this.config.get<string>('apiKey') ?? '';
-    if (!provided || !safeEqual(provided, expected)) {
+    if (!expected || !provided || !safeEqual(provided, expected)) {
       throw new UnauthorizedException('Invalid or missing API key');
     }
     return true;

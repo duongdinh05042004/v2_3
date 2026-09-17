@@ -25,6 +25,7 @@ section,
 pre,
 textarea,
 button,
+input,
 p,
 h1,
 h2,
@@ -68,7 +69,8 @@ section {
 }
 
 pre,
-textarea {
+textarea,
+input {
   width: 100%;
   min-height: 280px;
   margin: 0;
@@ -78,6 +80,13 @@ textarea {
   font-size: 13px;
   resize: vertical;
   caret-color: #000000;
+}
+
+input {
+  width: auto;
+  min-height: 0;
+  margin-left: 8px;
+  resize: none;
 }
 
 pre {

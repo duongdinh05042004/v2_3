@@ -1,29 +1,48 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class DealRuleDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   id?: string;
 
   @ApiProperty({ example: "campaign.campaign_name CONTAINS 'sale'" })
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
   condition!: string;
 
-  @ApiProperty({ example: 'create_deal' })
+  @ApiProperty({ example: 'create_deal', enum: ['create_deal'] })
   @IsString()
+  @IsIn(['create_deal'])
   action!: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   pipeline_id?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   stage_id?: string;
 
   @ApiProperty({ required: false })
@@ -53,6 +72,7 @@ export class UpdateRulesDto {
     ],
   })
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => DealRuleDto)
   deal_rules!: DealRuleDto[];

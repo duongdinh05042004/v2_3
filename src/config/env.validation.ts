@@ -3,7 +3,7 @@ import * as Joi from 'joi';
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().default(3000),
-  API_KEY: Joi.string().min(8).optional(),
+  API_KEY: Joi.string().min(8).required(),
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().default(5432),
   DB_USER: Joi.string().required(),
@@ -13,4 +13,7 @@ export const envValidationSchema = Joi.object({
   REDIS_PORT: Joi.number().default(6379),
   TIKTOK_APP_SECRET: Joi.string().required(),
   BITRIX24_WEBHOOK_URL: Joi.string().uri().required(),
+  BITRIX24_WEBHOOK_SECRET: Joi.string().min(8).required(),
+  CORS_ORIGINS: Joi.string().allow('').optional(),
+  SWAGGER_ENABLED: Joi.boolean().optional(),
 });

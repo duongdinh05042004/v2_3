@@ -14,12 +14,16 @@ describe('Bitrix24WebhookService', () => {
     );
   });
 
+  it('rejects a missing secret', async () => {
+    await expect(service.handle({ event: 'ONCRMDEALUPDATE' })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('updates a mapped deal when Bitrix24 stage changes', async () => {
     deals.findByBitrixId.mockResolvedValue({ id: 'deal-1' });
     await service.handle(
       { event: 'ONCRMDEALUPDATE', data: { FIELDS: { ID: 99, STAGE_ID: 'WON' } } },
       'expected-secret',
     );
-    expect(deals.updateStatus).toHaveBeenCalledWith('deal-1', 'won', 'WON');
+    expect(deals.updateStatus).toHaveBeenCalledWith('deal-1', 'won', 'WON', undefined, true);
   });
 });

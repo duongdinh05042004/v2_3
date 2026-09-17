@@ -32,9 +32,22 @@ describe('ApiKeyGuard', () => {
     expect(guard.canActivate(ctx({ 'x-api-key': 'secret-key' }))).toBe(true);
   });
 
+  it('accepts a matching Bearer token', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(false);
+    expect(guard.canActivate(ctx({ authorization: 'Bearer secret-key' }))).toBe(true);
+  });
+
   it('rejects missing or wrong keys', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(false);
     expect(() => guard.canActivate(ctx({}))).toThrow(UnauthorizedException);
     expect(() => guard.canActivate(ctx({ 'x-api-key': 'nope' }))).toThrow(UnauthorizedException);
+  });
+
+  it('rejects when the server API key is not configured', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(false);
+    const unconfigured = new ApiKeyGuard(reflector, {
+      get: jest.fn().mockReturnValue(''),
+    } as unknown as ConfigService);
+    expect(() => unconfigured.canActivate(ctx({ 'x-api-key': 'anything' }))).toThrow(UnauthorizedException);
   });
 });

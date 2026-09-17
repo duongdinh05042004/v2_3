@@ -1,8 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { AnalyticsService } from './analytics.service';
 
 @ApiTags('analytics')
+@ApiSecurity('api-key')
+@ApiHeader({ name: 'x-api-key', required: true })
+@UseGuards(ApiKeyGuard)
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}

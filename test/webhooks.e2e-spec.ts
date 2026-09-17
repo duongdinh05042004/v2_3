@@ -1,8 +1,11 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { ConfigService } from '@nestjs/config';
+import { ApiKeyGuard } from '../src/common/guards/api-key.guard';
+import { appValidationPipe } from '../src/common/pipes/app-validation.pipe';
 import { TikTokSignatureService } from '../src/integrations/tiktok/tiktok-signature.service';
 import { TikTokWebhookService } from '../src/modules/webhooks/tiktok-webhook.service';
 import { WebhooksController } from '../src/modules/webhooks/webhooks.controller';
@@ -18,6 +21,8 @@ describe('Webhooks (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [WebhooksController],
       providers: [
+        ApiKeyGuard,
+        Reflector,
         { provide: TikTokWebhookService, useValue: { handle } },
         { provide: Bitrix24WebhookService, useValue: { handle: bitrixHandle } },
         {
@@ -29,7 +34,7 @@ describe('Webhooks (e2e)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication({ rawBody: true });
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    app.useGlobalPipes(appValidationPipe);
     await app.init();
   });
 
@@ -49,6 +54,7 @@ describe('Webhooks (e2e)', () => {
   it('POST /webhooks/bitrix24/deals accepts deal updates', async () => {
     await request(app.getHttpServer())
       .post('/webhooks/bitrix24/deals')
+      .set('x-bitrix-secret', 'secret')
       .send({ event: 'ONCRMDEALUPDATE', data: { FIELDS: { ID: 1, STAGE_ID: 'WON' } } })
       .expect(201);
     expect(bitrixHandle).toHaveBeenCalled();

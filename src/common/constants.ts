@@ -59,6 +59,12 @@ export const DEAL_STATUS = {
   LOST: 'lost',
 } as const;
 
+export const APPROVAL_STATUS = {
+  DRAFT: 'draft',
+  PENDING_APPROVAL: 'pending_approval',
+  APPROVED: 'approved',
+} as const;
+
 export const SYNC_STATUS = {
   PENDING: 'pending',
   SYNCING: 'syncing',

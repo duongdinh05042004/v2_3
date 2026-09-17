@@ -1,14 +1,19 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JOB_NAMES, QUEUE_NAMES } from '../../common/constants';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { TimelineService } from '../timeline/timeline.service';
 import { DealsService } from '../deals/deals.service';
+import { BatchImportLeadsDto } from './dto/batch-import.dto';
 import { ListLeadsDto } from './dto/list-leads.dto';
 import { LeadsService } from './leads.service';
 
 @ApiTags('leads')
+@ApiSecurity('api-key')
+@ApiHeader({ name: 'x-api-key', required: true })
+@UseGuards(ApiKeyGuard)
 @Controller('leads')
 export class LeadsController {
   constructor(
@@ -20,8 +25,8 @@ export class LeadsController {
 
   @Post('batch-import')
   @ApiOperation({ summary: 'Batch import historical TikTok leads for migration' })
-  batchImport(@Body() body: { payloads: Parameters<LeadsService['batchImport']>[0] }) {
-    return this.leads.batchImport(body.payloads ?? []);
+  batchImport(@Body() body: BatchImportLeadsDto) {
+    return this.leads.batchImport(body.payloads);
   }
 
   @Get()

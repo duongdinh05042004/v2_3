@@ -1,14 +1,18 @@
-import { Body, Controller, Headers, Post, Req } from '@nestjs/common';
+import { Body, Controller, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
+import { Bitrix24WebhookDto } from './dto/bitrix24-webhook.dto';
 import { TikTokWebhookDto } from './dto/tiktok-webhook.dto';
-import { Bitrix24WebhookService, BitrixDealWebhook } from './bitrix24-webhook.service';
+import { Bitrix24WebhookService } from './bitrix24-webhook.service';
 import { TikTokWebhookService } from './tiktok-webhook.service';
 
 @ApiTags('webhooks')
 @ApiExcludeController()
+@Public()
+@UseGuards(ApiKeyGuard)
 @Controller('webhooks')
 export class WebhooksController {
   constructor(
@@ -16,7 +20,6 @@ export class WebhooksController {
     private readonly bitrix: Bitrix24WebhookService,
   ) {}
 
-  @Public()
   @Throttle({ default: { limit: 300, ttl: 60000 } })
   @Post('tiktok/leads')
   @ApiOperation({ summary: 'TikTok Lead Generation webhook receiver' })
@@ -32,13 +35,12 @@ export class WebhooksController {
     });
   }
 
-  @Public()
   @Throttle({ default: { limit: 300, ttl: 60000 } })
   @Post('bitrix24/deals')
   @ApiOperation({ summary: 'Bitrix24 deal status webhook receiver' })
   receiveBitrix(
     @Headers('x-bitrix-secret') secret: string | undefined,
-    @Body() body: BitrixDealWebhook,
+    @Body() body: Bitrix24WebhookDto,
   ) {
     return this.bitrix.handle(body, secret);
   }

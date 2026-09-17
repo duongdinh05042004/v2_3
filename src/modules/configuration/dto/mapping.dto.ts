@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject } from 'class-validator';
+import { IsNotEmptyObject } from 'class-validator';
+import { IsStringRecord } from '../../../common/validators/is-string-record.validator';
 
 export class UpdateMappingsDto {
   @ApiProperty({
@@ -13,6 +14,7 @@ export class UpdateMappingsDto {
       'lead_data.ttclid': 'UF_CRM_TTCLID',
     },
   })
-  @IsObject()
+  @IsNotEmptyObject()
+  @IsStringRecord()
   field_mapping!: Record<string, string>;
 }

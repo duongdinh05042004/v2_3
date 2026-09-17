@@ -20,11 +20,15 @@ Sau đó mở:
 | Mục | URL |
 | --- | --- |
 | Cấu hình / mapping | http://localhost:3000 |
-| Swagger UI | http://localhost:3000/docs |
-| OpenAPI JSON | http://localhost:3000/docs/swagger.json |
+| Swagger UI | http://localhost:3000/docs?api_key=change-me-to-a-strong-random-key |
+| OpenAPI JSON | http://localhost:3000/docs/swagger.json (cần `api_key`) |
 | Health | http://localhost:3000/health |
 | Conversion rates | http://localhost:3000/api/v1/analytics/conversion-rates |
 | Bitrix24 mock log | http://localhost:4002/_debug/calls |
+
+**API key:** mọi `/api/v1/*` yêu cầu header `x-api-key` (= `API_KEY` trong `.env`). `/docs` cũng cần key (`?api_key=` hoặc header). Webhook TikTok/Bitrix24 và `/health` là public (vẫn verify chữ ký / `x-bitrix-secret`). Màn mapping có ô nhập key.
+
+Hướng dẫn gọi API, workflow phê duyệt và quyền sửa: [docs/USAGE.md](docs/USAGE.md).
 
 Cấu hình và mapping xem/sửa qua API (đúng đề bài, không có màn admin riêng):
 
@@ -68,6 +72,7 @@ npm run mock:tiktok
 | Rule engine Lead → Deal | `RuleEngineService` (CONTAINS/EQUALS/AND/OR/IN/…) |
 | Pipeline + probability | Seed `pipeline` + rule `probability` |
 | Auto-assign sales | `AssignmentService` (rule + capacity + least-loaded fallback) |
+| Direct manager + edit-before-approve | `WorkflowService`: snapshot `managerExternalId`, `GET /deals/:id/workflow`, submit/approve; khóa sửa sau phê duyệt cuối; `won` bắt buộc approved |
 | Notification | `NotificationsService` (log hoặc outbound webhook) |
 | Conversion / CPL / ROI / quality | `AnalyticsService` + cache Redis 30–60s |
 | Export CSV/Excel/JSON | `GET /api/v1/reports/export?format=csv&date_range=30d` |
@@ -78,7 +83,7 @@ npm run mock:tiktok
 ### Kiến trúc & code quality (25%)
 
 - NestJS 11, module theo bounded context: `webhooks`, `leads`, `deals`, `sync`, `configuration`, `analytics`, `reports`, `queue`.
-- DI / Guards (`ApiKeyGuard`, `ThrottlerGuard`) / Interceptors (logging + envelope) / Filters (standardized error).
+- DI / Guards: `ThrottlerGuard` **và** `ApiKeyGuard` là `APP_GUARD` toàn cục; **đồng thời `@UseGuards(ApiKeyGuard)` trên từng controller** (leads/deals/config/analytics/reports/webhooks). Webhook + health dùng `@Public()`. ValidationPipe `whitelist` + `forbidNonWhitelisted`. Interceptors (logging + envelope) / Filters (standardized error).
 - PostgreSQL schema có index trên email, phone, campaign, status, created_at; unique `event_id`.
 - Pino structured logging + error stack cho 5xx.
 
@@ -140,7 +145,7 @@ flowchart TB
 
 Schema mở rộng so với đề bài (đủ audit, scoring, sync, DLQ) nhưng **giữ nguyên** các bảng bắt buộc `leads`, `deals`, `configurations`.
 
-Migration: `src/database/migrations/1700000000000-InitSchema.ts`
+Migration: `src/database/migrations/1700000000000-InitSchema.ts`, `1700000000001-ApprovalWorkflow.ts` (cột `manager_external_id`, `approval_status`).
 
 ERD:
 
@@ -163,21 +168,28 @@ erDiagram
 
 ## 5. API (đúng path đề bài)
 
-| Method | Path | Ghi chú |
-| --- | --- | --- |
-| POST | `/webhooks/tiktok/leads` | Header `TikTok-Signature` |
-| POST | `/webhooks/bitrix24/deals` | Webhook Deal Bitrix24 |
-| GET | `/api/v1/leads?page=1&limit=10&source=tiktok` | |
-| GET | `/api/v1/deals?status=open&assigned_to=user_id` | |
-| POST | `/api/v1/leads/:id/convert-to-deal` | |
-| GET/PUT | `/api/v1/config/mappings` | Body/response: `{ "field_mapping": { ... } }` |
-| GET/PUT | `/api/v1/config/rules` | Body/response: `{ "deal_rules": [ ... ] }` |
-| GET | `/api/v1/analytics/conversion-rates` | |
-| GET | `/api/v1/analytics/campaign-performance` | |
-| GET | `/api/v1/reports/export?format=csv&date_range=30d` | |
-| GET | `/health` | Demo requirement |
+Protected endpoints cần header `x-api-key` (xem [docs/USAGE.md](docs/USAGE.md)).
 
-Bổ sung hữu ích: `GET /api/v1/analytics/dashboard`, `POST /api/v1/leads/batch-import`, `PATCH /api/v1/deals/:id/status`, `POST /api/v1/leads/:id/sync`.
+| Method | Path | Auth | Ghi chú |
+| --- | --- | --- | --- |
+| POST | `/webhooks/tiktok/leads` | TikTok-Signature | Public |
+| POST | `/webhooks/bitrix24/deals` | x-bitrix-secret | Public |
+| GET | `/api/v1/leads?page=1&limit=10&source=tiktok` | API key | |
+| GET | `/api/v1/deals?status=open&assigned_to=user_id` | API key | |
+| POST | `/api/v1/leads/:id/convert-to-deal` | API key | |
+| GET/PUT | `/api/v1/config/mappings` | API key | Body/response: `{ "field_mapping": { ... } }` |
+| GET/PUT | `/api/v1/config/rules` | API key | Body/response: `{ "deal_rules": [ ... ] }` |
+| GET | `/api/v1/analytics/conversion-rates` | API key | |
+| GET | `/api/v1/analytics/campaign-performance` | API key | |
+| GET | `/api/v1/reports/export?format=csv&date_range=30d` | API key | |
+| GET | `/health` | Public | Demo requirement |
+| GET | `/api/v1/deals/:id/workflow` | API key + `x-actor-id` | Direct manager + edit/approve flags |
+| PATCH | `/api/v1/deals/:id` | API key + `x-actor-id` | Sửa trước phê duyệt cuối |
+| POST | `/api/v1/deals/:id/submit-approval` | API key + `x-actor-id` | Assignee gửi manager |
+| POST | `/api/v1/deals/:id/approve` | API key + `x-actor-id` | Chỉ direct manager |
+| PATCH | `/api/v1/deals/:id/status` | API key | `won` chỉ sau `approved` |
+
+Bổ sung hữu ích: `GET /api/v1/analytics/dashboard`, `POST /api/v1/leads/batch-import`, `POST /api/v1/leads/:id/sync`.
 
 ### Ví dụ webhook đã ký
 
@@ -218,7 +230,7 @@ Seed ghi đúng config mẫu của đề bài:
 }
 ```
 
-Campaign mẫu **Spring Sale 2024** sẽ tự convert thành Deal (rule CONTAINS `'sale'`), assign `sp_hanoi` vì city = Hà Nội.
+Campaign mẫu **Spring Sale 2024** sẽ tự convert thành Deal (rule CONTAINS `'sale'`), assign `sp_hanoi` vì city = Hà Nội, gắn direct manager `sp_manager`. Deal ở trạng thái `draft` — sales được sửa cho đến khi manager phê duyệt cuối; `won` chỉ sau `approved`.
 
 ---
 
@@ -241,15 +253,16 @@ Unit test cover: chữ ký TikTok, normalize phone/email, field mapper, rule eng
 ```text
 src/
   common/          guards, filters, interceptors, utils
+  auth/            ApiKeyGuard provider (@UseGuards on protected controllers)
   config/          env + Joi validation
   database/        entities, migrations, seeds
   integrations/    TikTok signature/events, Bitrix24 REST client
-  modules/         leads, deals, webhooks, analytics, reports, config
+  modules/         leads, deals (workflow), webhooks, analytics, reports, config
   queue/           processors + DLQ + schedulers
   cache/           Redis cache
 mocks/             Bitrix24 + TikTok mock servers + sample payload
 scripts/           send signed webhook, export swagger
-docs/              architecture, deployment
+docs/              architecture, deployment, usage
 ```
 
 ---
@@ -276,6 +289,7 @@ Lỗi phổ biến:
 - `Invalid TikTok signature` → sai `TIKTOK_APP_SECRET` hoặc proxy rewrite body.
 - Webhook 201 nhưng chưa có lead → Redis/BullMQ chưa lên; xem `dead_letter_jobs`.
 - Bitrix fail → `GET http://localhost:4002/_debug/calls` hoặc `bitrix24SyncError` trên lead.
+- `401 Invalid or missing API key` → thiếu header `x-api-key` (giá trị `API_KEY` trong `.env`). Webhook và `/health` không cần key.
 
 ---
 

@@ -99,6 +99,16 @@ export const defaultConfigurations = [
 
 export const defaultSalesPersons = [
   {
+    externalId: 'sp_manager',
+    name: 'Huong Le',
+    email: 'huong.le@example.com',
+    bitrix24UserId: 100,
+    territories: [],
+    specialties: ['management'],
+    maxOpenDeals: 100,
+    managerExternalId: null,
+  },
+  {
     externalId: 'sp_hanoi',
     name: 'Lan Nguyen',
     email: 'lan.nguyen@example.com',
@@ -106,6 +116,7 @@ export const defaultSalesPersons = [
     territories: ['Hà Nội', 'Ha Noi', 'Hanoi'],
     specialties: ['enterprise'],
     maxOpenDeals: 40,
+    managerExternalId: 'sp_manager',
   },
   {
     externalId: 'sp_tech',
@@ -115,14 +126,16 @@ export const defaultSalesPersons = [
     territories: [],
     specialties: ['technology', 'mobile apps'],
     maxOpenDeals: 35,
+    managerExternalId: 'sp_manager',
   },
   {
     externalId: 'sp_round_robin',
     name: 'Round Robin Desk',
     email: 'sales.desk@example.com',
-    bitrix24UserId: 100,
+    bitrix24UserId: 103,
     territories: [],
     specialties: [],
     maxOpenDeals: 80,
+    managerExternalId: 'sp_manager',
   },
 ];

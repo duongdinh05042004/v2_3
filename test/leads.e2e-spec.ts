@@ -1,16 +1,20 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { getQueueToken } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '../src/common/constants';
+import { ApiKeyGuard } from '../src/common/guards/api-key.guard';
+import { appValidationPipe } from '../src/common/pipes/app-validation.pipe';
 import { LeadsController } from '../src/modules/leads/leads.controller';
 import { LeadsService } from '../src/modules/leads/leads.service';
 import { DealsService } from '../src/modules/deals/deals.service';
 import { TimelineService } from '../src/modules/timeline/timeline.service';
-import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Leads API (e2e)', () => {
   let app: INestApplication<App>;
+  const apiKey = 'test-api-key-123';
   const leads = {
     findAll: jest.fn(async () => ({ data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } })),
     findOne: jest.fn(async () => ({ id: '11111111-1111-1111-1111-111111111111', name: 'A' })),
@@ -22,8 +26,16 @@ describe('Leads API (e2e)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          ignoreEnvFile: true,
+          load: [() => ({ apiKey })],
+        }),
+      ],
       controllers: [LeadsController],
       providers: [
+        ApiKeyGuard,
         { provide: LeadsService, useValue: leads },
         { provide: DealsService, useValue: deals },
         { provide: TimelineService, useValue: timeline },
@@ -32,7 +44,7 @@ describe('Leads API (e2e)', () => {
     }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    app.useGlobalPipes(appValidationPipe);
     await app.init();
   });
 
@@ -40,15 +52,32 @@ describe('Leads API (e2e)', () => {
     await app.close();
   });
 
+  it('rejects requests without x-api-key', async () => {
+    await request(app.getHttpServer()).get('/api/v1/leads?page=1&limit=10').expect(401);
+  });
+
   it('GET /api/v1/leads lists leads', async () => {
-    await request(app.getHttpServer()).get('/api/v1/leads?page=1&limit=10&source=tiktok').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/leads?page=1&limit=10&source=tiktok')
+      .set('x-api-key', apiKey)
+      .expect(200);
     expect(leads.findAll).toHaveBeenCalled();
   });
 
   it('POST /api/v1/leads/:id/convert-to-deal converts a lead', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/leads/11111111-1111-1111-1111-111111111111/convert-to-deal')
+      .set('x-api-key', apiKey)
       .expect(201);
     expect(deals.convertLead).toHaveBeenCalled();
+  });
+
+  it('rejects an invalid batch-import body', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/leads/batch-import')
+      .set('x-api-key', apiKey)
+      .send({ payloads: { event: 'lead.generate' } })
+      .expect(400);
+    expect(leads.batchImport).not.toHaveBeenCalled();
   });
 });

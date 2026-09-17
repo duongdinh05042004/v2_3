@@ -1,22 +1,15 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { Response } from 'express';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
+import { ExportQueryDto } from './dto/export-query.dto';
 import { ReportsService } from './reports.service';
 
-class ExportQueryDto {
-  @IsOptional()
-  @IsIn(['csv', 'xlsx', 'json'])
-  format: 'csv' | 'xlsx' | 'json' = 'csv';
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d+d$/)
-  date_range = '30d';
-}
-
 @ApiTags('reports')
+@ApiSecurity('api-key')
+@ApiHeader({ name: 'x-api-key', required: true })
+@UseGuards(ApiKeyGuard)
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
