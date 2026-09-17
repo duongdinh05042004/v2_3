@@ -1,9 +1,10 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
 export class AppCacheService implements OnModuleDestroy {
+  private readonly logger = new Logger(AppCacheService.name);
   private readonly redis: Redis;
   private readonly defaultTtl: number;
 
@@ -13,26 +14,44 @@ export class AppCacheService implements OnModuleDestroy {
       port: this.config.get<number>('redis.port'),
       password: this.config.get<string>('redis.password') || undefined,
       db: this.config.get<number>('redis.db') ?? 0,
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
       lazyConnect: false,
+      retryStrategy: (times) => Math.min(times * 200, 2000),
+    });
+    this.redis.on('error', (error) => {
+      this.logger.warn(`Redis: ${error.message}`);
     });
     this.defaultTtl = this.config.get<number>('cache.ttlSeconds') ?? 60;
   }
 
   async get<T>(key: string): Promise<T | null> {
-    const raw = await this.redis.get(key);
-    if (!raw) {
+    try {
+      const raw = await this.redis.get(key);
+      if (!raw) {
+        return null;
+      }
+      return JSON.parse(raw) as T;
+    } catch (error) {
+      this.logger.warn(`cache get ${key} failed: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
-    return JSON.parse(raw) as T;
   }
 
   async set(key: string, value: unknown, ttlSeconds = this.defaultTtl): Promise<void> {
-    await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+    try {
+      await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+    } catch (error) {
+      this.logger.warn(`cache set ${key} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async del(key: string): Promise<void> {
-    await this.redis.del(key);
+    try {
+      await this.redis.del(key);
+    } catch (error) {
+      this.logger.warn(`cache del ${key} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async wrap<T>(key: string, factory: () => Promise<T>, ttlSeconds = this.defaultTtl): Promise<T> {
@@ -46,10 +65,18 @@ export class AppCacheService implements OnModuleDestroy {
   }
 
   async ping(): Promise<string> {
-    return this.redis.ping();
+    try {
+      return await this.redis.ping();
+    } catch {
+      return 'DOWN';
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.redis.quit();
+    try {
+      await this.redis.quit();
+    } catch {
+      this.redis.disconnect();
+    }
   }
 }

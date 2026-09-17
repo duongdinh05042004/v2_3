@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: builder
-    command: npm run start:dev
+    # Do not use start:dev here — that bootstraps local Docker-from-host infra.
+    command: npm run start:docker
     working_dir: /app
     volumes:
       - ./:/app
@@ -12,12 +13,30 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
+      NODE_ENV: development
+      PORT: 3000
+      API_KEY: ${API_KEY:-change-me-to-a-strong-random-key}
       DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-tiktok}
+      DB_PASSWORD: ${DB_PASSWORD:-tiktok_secret}
+      DB_NAME: ${DB_NAME:-tiktok_bitrix24}
+      DB_SYNC: 'false'
       REDIS_HOST: redis
-      BITRIX24_WEBHOOK_URL: http://bitrix24-mock:4002/rest
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ''
+      REDIS_DB: 0
+      TIKTOK_APP_SECRET: ${TIKTOK_APP_SECRET:-tiktok_app_secret_change_me}
+      TIKTOK_ACCESS_TOKEN: ${TIKTOK_ACCESS_TOKEN:-mock-tiktok-access-token}
+      TIKTOK_PIXEL_CODE: ${TIKTOK_PIXEL_CODE:-CXXXXXXXXXXXXXXX}
       TIKTOK_API_BASE_URL: http://tiktok-mock:4001
+      BITRIX24_WEBHOOK_URL: http://bitrix24-mock:4002/rest
+      BITRIX24_WEBHOOK_SECRET: ${BITRIX24_WEBHOOK_SECRET:-bitrix24_webhook_secret_change_me}
+      SWAGGER_ENABLED: 'true'
+      CORS_ORIGINS: http://localhost:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,20 +53,20 @@ services:
       interval: 20s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 40s
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: tiktok
-      POSTGRES_PASSWORD: tiktok_secret
-      POSTGRES_DB: tiktok_bitrix24
+      POSTGRES_USER: ${DB_USER:-tiktok}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tiktok_secret}
+      POSTGRES_DB: ${DB_NAME:-tiktok_bitrix24}
     ports:
-      - '5432:5432'
+      - '${DB_PORT:-5432}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U tiktok -d tiktok_bitrix24']
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -55,7 +74,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s

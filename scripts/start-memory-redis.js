@@ -1,7 +1,7 @@
 const { RedisMemoryServer } = require('redis-memory-server');
 
 async function main() {
-  const port = parseInt(process.env.REDIS_PORT || '6380', 10);
+  const port = parseInt(process.env.REDIS_PORT || '6379', 10);
   const server = new RedisMemoryServer({
     instance: { port, ip: '127.0.0.1' },
     autoStart: false,

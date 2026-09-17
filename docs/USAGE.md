@@ -2,24 +2,31 @@
 
 Tài liệu này mô tả cách gọi API sau khi đã triển khai authentication bằng API key và workflow phê duyệt Deal (người quản lý trực tiếp + quyền chỉnh sửa trước bước phê duyệt cuối).
 
-## 1. Khởi động
+## 1. Khởi động (mọi máy sau clone/pull)
 
 ```bash
-cp .env.example .env
+npm run setup                 # tạo .env nếu chưa có
+cp .env.example .env          # tương đương nếu chưa chạy setup
+```
+
+**Docker full (khuyến nghị):**
+
+```bash
 docker compose up --build
 docker compose exec api npm run seed
 ```
 
-Hoặc local:
+**API local + infra Docker:**
 
 ```bash
 npm install
-npm run migration:run
-npm run seed
+npm run infra:up
+npm run migration:run && npm run seed
 npm run start:dev
 ```
 
 Giá trị `API_KEY` trong `.env` là bí mật service-to-service. Mặc định demo: `change-me-to-a-strong-random-key`.
+Chi tiết portable setup: [DEPLOYMENT.md](DEPLOYMENT.md) / README mục 1.
 
 ## 2. Authentication (API key)
 
@@ -53,7 +60,8 @@ Thiếu hoặc sai key → `401 Invalid or missing API key`.
 
 Swagger UI (`/docs`) cũng yêu cầu API key: mở `http://localhost:3000/docs?api_key=change-me-to-a-strong-random-key` rồi Authorize để gọi thử API.
 
-Màn mapping tại `http://localhost:3000` gửi header `x-api-key` từ ô API key (lưu `localStorage`).
+Màn mapping `http://localhost:3000` tự gửi `x-api-key` (mặc định trùng `API_KEY` trong `.env.example`).
+
 
 ```bash
 curl -s -H "x-api-key: change-me-to-a-strong-random-key" \

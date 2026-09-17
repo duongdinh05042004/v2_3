@@ -1,9 +1,9 @@
 const currentEl = document.getElementById('current-config');
 const editorEl = document.getElementById('mapping-editor');
 const statusEl = document.getElementById('status');
-const apiKeyEl = document.getElementById('api-key');
 
 const API_KEY_STORAGE = 'tb24.apiKey';
+const DEFAULT_API_KEY = 'change-me-to-a-strong-random-key';
 
 function unwrap(payload) {
   if (payload && payload.success === true && payload.data !== undefined) {
@@ -16,31 +16,45 @@ function showStatus(message) {
   statusEl.textContent = message;
 }
 
-function apiHeaders(extra) {
-  const headers = { ...(extra || {}) };
-  const apiKey = apiKeyEl.value.trim();
-  if (apiKey) {
-    headers['x-api-key'] = apiKey;
-  }
-  return headers;
+function getApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE) || DEFAULT_API_KEY;
 }
 
-function persistApiKey() {
-  localStorage.setItem(API_KEY_STORAGE, apiKeyEl.value.trim());
+function apiHeaders(extra) {
+  return {
+    ...(extra || {}),
+    'x-api-key': getApiKey(),
+  };
+}
+
+async function readError(res) {
+  try {
+    const body = await res.json();
+    const err = body?.error ?? body?.message ?? body;
+    if (Array.isArray(err)) {
+      return err.join('; ');
+    }
+    if (typeof err === 'string') {
+      return err;
+    }
+    return JSON.stringify(err);
+  } catch {
+    return res.statusText || `HTTP ${res.status}`;
+  }
 }
 
 async function loadConfig() {
   showStatus('');
-  persistApiKey();
   const [mappingRes, rulesRes] = await Promise.all([
     fetch('/api/v1/config/mappings', { headers: apiHeaders() }),
     fetch('/api/v1/config/rules', { headers: apiHeaders() }),
   ]);
   if (mappingRes.status === 401 || rulesRes.status === 401) {
-    throw new Error('Thiếu hoặc sai API key. Điền x-api-key (giá trị API_KEY trong .env).');
+    throw new Error('Sai API_KEY. Giá trị mặc định phải trùng API_KEY trong .env.');
   }
   if (!mappingRes.ok || !rulesRes.ok) {
-    throw new Error('Không đọc được cấu hình. Kiểm tra API đã chạy chưa.');
+    const detail = !mappingRes.ok ? await readError(mappingRes) : await readError(rulesRes);
+    throw new Error(`Không đọc được cấu hình (${detail}). Kiểm tra API/Redis đã chạy.`);
   }
   const mapping = unwrap(await mappingRes.json());
   const rules = unwrap(await rulesRes.json());
@@ -62,10 +76,9 @@ async function saveConfig() {
     return;
   }
   if (!parsed.field_mapping || !parsed.deal_rules) {
-    showStatus('Cần đúng 2 khóa đề bài: field_mapping và deal_rules.');
+    showStatus('Cần đúng 2 khóa: field_mapping và deal_rules.');
     return;
   }
-  persistApiKey();
   const [mappingRes, rulesRes] = await Promise.all([
     fetch('/api/v1/config/mappings', {
       method: 'PUT',
@@ -79,18 +92,17 @@ async function saveConfig() {
     }),
   ]);
   if (mappingRes.status === 401 || rulesRes.status === 401) {
-    showStatus('Thiếu hoặc sai API key.');
+    showStatus('Sai API_KEY (phải trùng API_KEY trong .env).');
     return;
   }
   if (!mappingRes.ok || !rulesRes.ok) {
-    showStatus('Lưu thất bại.');
+    const detail = !mappingRes.ok ? await readError(mappingRes) : await readError(rulesRes);
+    showStatus(`Lưu thất bại: ${detail}`);
     return;
   }
   await loadConfig();
   showStatus('Đã lưu.');
 }
-
-apiKeyEl.value = localStorage.getItem(API_KEY_STORAGE) || 'change-me-to-a-strong-random-key';
 
 document.getElementById('save-btn').addEventListener('click', () => {
   saveConfig().catch((error) => showStatus(error.message));
@@ -101,7 +113,6 @@ document.getElementById('reload-btn').addEventListener('click', () => {
     showStatus(error.message);
   });
 });
-apiKeyEl.addEventListener('change', persistApiKey);
 
 loadConfig().catch((error) => {
   currentEl.textContent = error.message;
